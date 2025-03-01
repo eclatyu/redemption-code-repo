@@ -3,7 +3,9 @@ const fetch = require('node-fetch');
 const app = express();
 const port = process.env.PORT || 3000;
 
+// 添加中间件以解析 JSON 和 URL 编码格式的请求体
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // 从环境变量读取密钥
 const API_KEY = process.env.SHOPIFY_API_KEY;
@@ -108,10 +110,12 @@ async function createDiscountCode(customerId, points) {
   return discountCode.discount_code.code;
 }
 
-
 // 处理兑换码请求
 app.post('/redeem', async (req, res) => {
   const { code, customerId } = req.body;
+  if (!code || !customerId) {
+    return res.status(400).json({ message: '缺少兑换码或客户 ID' });
+  }
   const pointsValue = await validateRedemptionCode(code);
   
   if (pointsValue) {
@@ -125,6 +129,9 @@ app.post('/redeem', async (req, res) => {
 // 处理积分抵扣请求
 app.post('/apply-points', async (req, res) => {
   const { points, customerId } = req.body;
+  if (!points || !customerId) {
+    return res.status(400).json({ message: '缺少积分或客户 ID' });
+  }
   const currentPoints = await getCustomerPoints(customerId);
   
   if (points > currentPoints) {
