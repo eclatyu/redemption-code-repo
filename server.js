@@ -1,38 +1,35 @@
 const express = require('express');
 const fetch = require('node-fetch');
 const app = express();
-const port = process.env.PORT || 3000; // 使用 Heroku 的动态端口
+const port = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// 从环境变量读取密钥
 const API_KEY = process.env.SHOPIFY_API_KEY;
 const ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN;
 const SHOP_NAME = process.env.SHOPIFY_SHOP_NAME || 'eclatyu';
 const API_VERSION = '2023-01';
 const BASE_URL = `https://${API_KEY}:${ACCESS_TOKEN}@${SHOP_NAME}.myshopify.com/admin/api/${API_VERSION}`;
 
-// 添加根路径路由
 app.get('/', (req, res) => {
-  res.send('Welcome to Redemption Code App!'); // 当访问根路径时返回欢迎消息
+  res.send('Welcome to Redemption Code App!');
 });
 
-// 验证兑换码
 async function validateRedemptionCode(code) {
   const url = `${BASE_URL}/discount_codes.json`;
   const response = await fetch(url, {
+    method: 'GET',
     headers: { 'X-Shopify-Access-Token': ACCESS_TOKEN }
   });
   const discounts = await response.json();
   for (const discount of discounts.discount_codes) {
     if (discount.code === code) {
-      return 50; // 假设每个兑换码值 50 积分
+      return 50; // 固定返回 50 积分
     }
   }
   return null;
 }
 
-// 获取客户积分
 async function getCustomerPoints(customerId) {
   const url = `${BASE_URL}/customers/${customerId}/metafields.json`;
   const response = await fetch(url, {
@@ -47,7 +44,6 @@ async function getCustomerPoints(customerId) {
   return 0;
 }
 
-// 更新客户积分
 async function updateCustomerPoints(customerId, points) {
   const url = `${BASE_URL}/customers/${customerId}/metafields.json`;
   const data = {
@@ -68,7 +64,6 @@ async function updateCustomerPoints(customerId, points) {
   });
 }
 
-// 处理兑换请求
 app.post('/redeem', async (req, res) => {
   const { code, customerId } = req.body;
   const pointsValue = await validateRedemptionCode(code);
@@ -83,7 +78,6 @@ app.post('/redeem', async (req, res) => {
   }
 });
 
-// 启动服务器
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
