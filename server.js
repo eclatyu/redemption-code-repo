@@ -1,7 +1,21 @@
 const express = require('express');
-const fetch = require('node-fetch');
+const cors = require('cors');
 const app = express();
-const port = process.env.PORT || 3000;
+
+app.use(cors()); // 启用 CORS，允许跨域请求
+app.use(express.json()); // 解析 JSON 请求体
+
+app.post('/redeem', (req, res) => {
+  const { code, customerId } = req.body;
+  if (!code || !customerId) {
+    return res.status(400).json({ message: '缺少兑换码或客户 ID' });
+  }
+  // 处理兑换逻辑
+  res.json({ message: '兑换成功' });
+});
+
+app.listen(process.env.PORT || 3000);
+
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
