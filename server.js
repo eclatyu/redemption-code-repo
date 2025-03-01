@@ -7,7 +7,7 @@ const port = process.env.PORT || 3000; // Heroku 动态端口
 
 // 启用 CORS，允许跨域请求
 app.use(cors({
-  origin: 'https://eclatayu.com', // 允许来自您的 Shopify 网站
+  origin: 'https://eclatoyu.com', // 允许来自您的 Shopify 网站
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type']
 }));
@@ -52,7 +52,12 @@ app.post('/redeem', async (req, res) => {
   }
 });
 
-// 处理未定义的 GET 请求，避免“cannot get”错误
+// 处理 GET /redeem 请求（可选）
+app.get('/redeem', (req, res) => {
+  res.status(405).send('Method Not Allowed: 请使用 POST 请求');
+});
+
+// 处理未定义的 GET 请求，避免“Cannot GET”错误
 app.get('*', (req, res) => {
   res.status(404).send('Cannot GET: 路由未定义');
 });
