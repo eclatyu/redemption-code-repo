@@ -7,6 +7,9 @@ const port = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+const cors = require('cors');
+app.use(cors({ origin: 'https://eclatyu.com' }));  // 仅允许 eclatyu.com 跨域
+
 // 从环境变量读取密钥
 const API_KEY = process.env.SHOPIFY_API_KEY;
 const ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN;
