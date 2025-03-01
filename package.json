@@ -1,7 +1,6 @@
 {
   "name": "redemption-code",
   "version": "1.0.0",
-  "description": "Redemption Code App for eclatYU",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -9,6 +8,6 @@
   "dependencies": {
     "express": "^4.17.1",
     "node-fetch": "^2.6.1",
-    "cors": "^2.8.5"  // 添加 cors 依赖
+    "cors": "^2.8.5"
   }
 }
