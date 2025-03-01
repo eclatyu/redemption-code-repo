@@ -108,11 +108,6 @@ async function createDiscountCode(customerId, points) {
   return discountCode.discount_code.code;
 }
 
-app.get('/test-redeem', async (req, res) => {
-  const code = 'CARBON50';
-  const points = await validateRedemptionCode(code);
-  res.send(`Points for ${code}: ${points}`);
-});
 
 // 处理兑换码请求
 app.post('/redeem', async (req, res) => {
