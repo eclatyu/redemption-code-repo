@@ -9,7 +9,7 @@ app.use(express.json());
 const API_KEY = process.env.SHOPIFY_API_KEY;
 const ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN;
 const SHOP_NAME = process.env.SHOPIFY_SHOP_NAME || 'eclatyu';
-const API_VERSION = '2023-01';
+const API_VERSION = '2023-10'; // 使用最新API版本
 const BASE_URL = `https://${API_KEY}:${ACCESS_TOKEN}@${SHOP_NAME}.myshopify.com/admin/api/${API_VERSION}`;
 
 // 根路径路由
@@ -17,35 +17,14 @@ app.get('/', (req, res) => {
   res.send('Welcome to Redemption Code App!');
 });
 
-// 验证兑换码函数（将新代码放在这里）
+// 验证兑换码（模拟兑换码列表）
 async function validateRedemptionCode(code) {
-  const url = `${BASE_URL}/discount_codes.json`;
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: { 'X-Shopify-Access-Token': ACCESS_TOKEN }
-  });
-
-  // 检查API响应状态
-  if (!response.ok) {
-    console.error('API request failed:', response.status, await response.text());
-    return null;
-  }
-
-  const discounts = await response.json();
-  console.log('Discounts response:', discounts);
-
-  // 验证discounts.discount_codes是否有效
-  if (!discounts || !Array.isArray(discounts.discount_codes)) {
-    console.error('Invalid discounts response:', discounts);
-    return null;
-  }
-
-  for (const discount of discounts.discount_codes) {
-    if (discount.code === code) {
-      return 50; // 兑换码有效，返回50积分
-    }
-  }
-  return null; // 兑换码无效
+  // 模拟兑换码验证（可以用数据库替换）
+  const validCodes = {
+    'CARBON50': 50, // 兑换码CARBON50值50积分
+    'CARBON100': 100 // 兑换码CARBON100值100积分
+  };
+  return validCodes[code] || null;
 }
 
 // 获取客户积分
@@ -66,11 +45,13 @@ async function getCustomerPoints(customerId) {
 // 更新客户积分
 async function updateCustomerPoints(customerId, points) {
   const url = `${BASE_URL}/customers/${customerId}/metafields.json`;
+  const currentPoints = await getCustomerPoints(customerId);
+  const newPoints = currentPoints + points;
   const data = {
     metafield: {
       namespace: 'carbon',
       key: 'points',
-      value: points.toString(),
+      value: newPoints.toString(),
       type: 'integer'
     }
   };
@@ -84,19 +65,74 @@ async function updateCustomerPoints(customerId, points) {
   });
 }
 
+// 生成折扣码
+async function createDiscountCode(customerId, points) {
+  const priceRuleUrl = `${BASE_URL}/price_rules.json`;
+  const priceRuleData = {
+    price_rule: {
+      title: `Carbon Points Discount for ${customerId}`,
+      target_type: "line_item",
+      target_selection: "all",
+      allocation_method: "across",
+      value_type: "fixed_amount",
+      value: `-${points}`, // 抵扣金额（积分等同于美元）
+      customer_selection: "all",
+      starts_at: new Date().toISOString()
+    }
+  };
+  const priceRuleResponse = await fetch(priceRuleUrl, {
+    method: "POST",
+    headers: {
+      'X-Shopify-Access-Token': ACCESS_TOKEN,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(priceRuleData)
+  });
+  const priceRule = await priceRuleResponse.json();
+
+  const discountCodeUrl = `${BASE_URL}/price_rules/${priceRule.price_rule.id}/discount_codes.json`;
+  const discountCodeData = {
+    discount_code: {
+      code: `CARBON_${customerId}_${Date.now()}`
+    }
+  };
+  const discountCodeResponse = await fetch(discountCodeUrl, {
+    method: "POST",
+    headers: {
+      'X-Shopify-Access-Token': ACCESS_TOKEN,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(discountCodeData)
+  });
+  const discountCode = await discountCodeResponse.json();
+  return discountCode.discount_code.code;
+}
+
 // 处理兑换码请求
 app.post('/redeem', async (req, res) => {
   const { code, customerId } = req.body;
   const pointsValue = await validateRedemptionCode(code);
   
   if (pointsValue) {
-    const currentPoints = await getCustomerPoints(customerId);
-    const newPoints = currentPoints + pointsValue;
-    await updateCustomerPoints(customerId, newPoints);
-    res.json({ message: `兑换成功！增加了 ${pointsValue} 积分，总积分：${newPoints}` });
+    await updateCustomerPoints(customerId, pointsValue);
+    res.json({ message: `兑换成功！增加了 ${pointsValue} 积分，总积分：${await getCustomerPoints(customerId)}` });
   } else {
     res.status(400).json({ message: '兑换码无效' });
   }
+});
+
+// 处理积分抵扣请求
+app.post('/apply-points', async (req, res) => {
+  const { points, customerId } = req.body;
+  const currentPoints = await getCustomerPoints(customerId);
+  
+  if (points > currentPoints) {
+    return res.status(400).json({ message: '积分不足' });
+  }
+
+  const discountCode = await createDiscountCode(customerId, points);
+  await updateCustomerPoints(customerId, currentPoints - points);
+  res.json({ message: `已生成折扣码 ${discountCode}，抵扣 ${points} 元` });
 });
 
 // 启动服务器
