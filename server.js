@@ -1,26 +1,22 @@
 const express = require('express');
 const cors = require('cors');
+const fetch = require('node-fetch'); // 请确保已安装 node-fetch
+
 const app = express();
+const port = process.env.PORT || 3000;
 
-app.use(cors()); // 启用 CORS，允许跨域请求
-app.use(express.json()); // 解析 JSON 请求体
+// 配置 CORS，允许来自 https://eclatyu.com 的请求
+app.use(cors({
+  origin: 'https://eclatyu.com',
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type']
+}));
 
-app.post('/redeem', (req, res) => {
-  const { code, customerId } = req.body;
-  if (!code || !customerId) {
-    return res.status(400).json({ message: '缺少兑换码或客户 ID' });
-  }
-  // 处理兑换逻辑
-  res.json({ message: '兑换成功' });
-});
-
-app.listen(process.env.PORT || 3000);
-
-
+// 解析请求体
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 配置环境变量
+// 配置 Shopify API 环境变量
 const API_KEY = process.env.SHOPIFY_API_KEY;
 const ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN;
 const SHOP_NAME = process.env.SHOPIFY_SHOP_NAME || 'eclatyu';
@@ -30,7 +26,7 @@ const BASE_URL = `https://${API_KEY}:${ACCESS_TOKEN}@${SHOP_NAME}.myshopify.com/
 // 验证兑换码
 async function validateRedemptionCode(code) {
   const validCodes = {
-    'CARBON50': 50, // 示例：CARBON50 兑换 50 积分
+    'CARBON50': 50 // 示例：CARBON50 兑换 50 积分
   };
   return validCodes[code] || null;
 }
@@ -56,7 +52,7 @@ async function getCustomerPoints(customerId) {
     return 0;
   } catch (error) {
     console.error(`获取客户 ${customerId} 积分失败: ${error.message}`);
-    throw error; // 向上抛出错误
+    throw error;
   }
 }
 
@@ -93,19 +89,37 @@ async function updateCustomerPoints(customerId, points) {
 
 // 处理兑换请求
 app.post('/redeem', async (req, res) => {
-  const { code, customerId } = req.body;
-  if (!code || !customerId) {
-    return res.status(400).json({ message: '缺少兑换码或客户 ID' });
+  try {
+    const { code, customerId } = req.body;
+    console.log(`收到兑换请求: code=${code}, customerId=${customerId}`);
+
+    // 验证请求参数
+    if (!code || typeof code !== 'string' || code.trim() === '') {
+      return res.status(400).json({ message: '兑换码不能为空或无效' });
+    }
+    if (!customerId || typeof customerId !== 'string' || !/^\d+$/.test(customerId)) {
+      return res.status(400).json({ message: '客户 ID 必须是有效的数字字符串' });
+    }
+
+    // 验证兑换码
+    const pointsValue = await validateRedemptionCode(code);
+    if (!pointsValue) {
+      return res.status(400).json({ message: '兑换码无效' });
+    }
+
+    // 更新客户积分
+    await updateCustomerPoints(customerId, pointsValue);
+    const newPoints = await getCustomerPoints(customerId);
+
+    // 返回成功响应
+    res.json({ message: `兑换成功！增加了 ${pointsValue} 积分，总积分：${newPoints}` });
+  } catch (error) {
+    console.error(`处理兑换请求失败: ${error.message}`);
+    res.status(500).json({ message: '服务器内部错误，请稍后重试' });
   }
-  // 验证兑换码逻辑
-  const pointsValue = (code === 'CARBON50') ? 50 : 0; // 示例
-  if (!pointsValue) {
-    return res.status(400).json({ message: '兑换码无效' });
-  }
-  // 更新客户积分逻辑（调用 Shopify API）
-  res.json({ message: `兑换成功！增加了 ${pointsValue} 积分` });
 });
 
+// 启动服务器
 app.listen(port, () => {
   console.log(`服务器运行在端口 ${port}`);
 });
